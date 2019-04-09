@@ -1,0 +1,19 @@
+version: "2.1"
+
+services:
+  postgres:
+    # image: postgres:latest
+    build: ./postgres
+    container_name: "pg-docker"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_HOST=localhost
+      - POSTGRES_PASSWORD=docker
+      - POSTGRES_DB=auth
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres:/var/lib/postgresql/data
+
+volumes: 
+  postgres:
