@@ -8,7 +8,8 @@ import User from "./controllers/user";
 const app = express();
 const port = 4000;
 
-app.enable("trust proxy");
+//for nginx reverse proxy
+// app.enable("trust proxy");
 
 const limiter = new rateLimit({
 	windowMs: 10 * 60 * 1000,
@@ -21,7 +22,7 @@ app.use(
 	})
 );
 app.use(bodyParser.json());
-app.use('limiter');
+app.use('/users/', limiter);
 
 // API ROUTES
 

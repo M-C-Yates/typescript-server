@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import express = require("express");
 import jwt from "jsonwebtoken";
 import { QueryResult, Pool } from "pg";
+import { promises } from "fs";
 
 dotenv.config();
 const pass = process.env.POSTGRES_PASSWORD;
@@ -25,6 +26,23 @@ export class User {
 		return token;
 	};
 
+	static findByToken = (token: string) => {
+		let decoded;
+		try {
+			decoded = jwt.verify(token, "wooasasdzxc");
+		} catch (e) {
+			return Promise.reject();
+		}
+
+		return pool.query(
+			"SELECT id FROM users where token=$1",
+			[token],
+			(error: Error, results: QueryResult) => {
+				console.log(results);
+			}
+		);
+	};
+
 	// Generate a user and stores their name, email,
 	// hashed password, genned auth token and current timestamp
 	static registerUser = async (req: express.Request, res: express.Response) => {
@@ -32,20 +50,29 @@ export class User {
 		const joined = new Date();
 		const hash = await bcrypt.hash(password, 10);
 		const token = await User.generateAuthToken(email);
+		async () => {
+			const client = await pool.connect();
+			try {
+				await client.query("BEGIN");
+				const registered = await client.query(
+					`INSERT INTO users (name, email, hash, token, joined) VALUES ($1,$2,$3,$4,$5)`,
+					[name, email, hash, token, joined]
+				);
+				const results = await client.query('SELECT * WHERE token= $1', [token]);
+				let rows = results.rows;
+				res
+				.status(200)
+				.header("x-auth", token)
+				.send({rows});
 
-		pool.query(
-			// create a row and insert the users info
-			"INSERT INTO users (name, email, hash, token, joined) VALUES ($1,$2,$3,$4,$5)",
-			[name, email, hash, token, joined],
-			(error: Error, results: QueryResult) => {
-				if (error) {
-					throw error;
-				}
-				// console.log(results)
-				res.header("x-auth", token).send(results.rows[0])
-				res.status(200).send(results);
+			} catch (e) {
+				await client.query("ROLLBACK");
+				throw e;
+			} finally {
+				client.release();
 			}
-		);
+		};
+
 	};
 	// log user in
 	static signInUser = async (req: express.Request, res: express.Response) => {
@@ -66,11 +93,16 @@ export class User {
 						"SELECT * FROM users WHERE email= $1 ",
 						[email],
 						(error: Error, results: QueryResult) => {
-							pool.query("UPDATE users SET token= $2 WHERE email= $1",
-							[email, token],
-							(error: Error, results: QueryResult) => {
-								res.header("x-auth", token).send(results);
-							})
+							pool.query(
+								"UPDATE users SET token= $2 WHERE email= $1",
+								[email, token],
+								(error: Error, results: QueryResult) => {
+									res
+										.status(200)
+										.header("x-auth", token)
+										.send(results);
+								}
+							);
 						}
 					);
 				}
