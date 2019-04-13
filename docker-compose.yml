@@ -1,6 +1,17 @@
 version: "2.1"
 
 services:
+  server:
+    container_name: backend
+    build: ./
+    command: npm start
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_HOST=localhost
+      - POSTGRES_PASSWORD=docker
+      - POSTGRES_DB=auth
+    ports: 
+      - "4000:4000"
   postgres:
     # image: postgres:latest
     build: ./postgres
