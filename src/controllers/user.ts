@@ -26,31 +26,20 @@ export class User {
 		return token;
 	};
 
-	static findByToken = (token: string) => {
+	static findByToken = async (token: string) => {
 		let decoded;
 		try {
 			decoded = jwt.verify(token, "wooasasdzxc");
 		} catch (e) {
 			return Promise.reject();
 		}
+		try {
+			const res = await pool.query("SELECT id FROM users WHERE token= $1", [token])
+			return res.rows[0].id;
+		} catch (e) {
+			throw e
+		}
 
-		(async () => {
-			const client = await pool.connect();
-			try {
-				await client.query("BEGIN");
-				const { rows } = await client.query(
-					`SELECT id FROM users WHERE token= $1`,
-					[token]
-				);
-				await client.query('COMMIT');
-				return rows;
-			} catch (e) {
-				await client.query("ROLLBACK");
-				throw e;
-			} finally {
-				client.release();
-			}
-		})().catch((e) => console.error(e.stack));
 	};
 
 	// Generate a user and stores their name, email,
@@ -73,7 +62,7 @@ export class User {
 					[token]
 				);
 				let rows = results.rows;
-				await client.query('COMMIT');
+				await client.query("COMMIT");
 				res
 					.status(200)
 					.header("x-auth", token)
@@ -96,39 +85,40 @@ export class User {
 		(async () => {
 			const client = await pool.connect();
 			try {
-				client.query("BEGIN")
+				client.query("BEGIN");
 				let { rows } = await client.query(
 					"SELECT * FROM users WHERE email= $1",
 					[email]
-				)
-				
-				const isValid = await bcrypt.compare(password, rows[0].hash)
+				);
+
+				const isValid = await bcrypt.compare(password, rows[0].hash);
 				if (isValid) {
-					console.log(token)
-					client.query(
-						"UPDATE users SET token= $1 WHERE email= $2",
-						[token, email]
-						)
-						res.status(200).header("x-auth", token).send(rows[0])
-					} else {
-					res.status(400).send("unable to login")
+					client.query("UPDATE users SET token= $1 WHERE email= $2", [
+						token,
+						email
+					]);
+					res
+						.status(200)
+						.header("x-auth", token)
+						.send(rows[0]);
+				} else {
+					res.status(400).send("unable to login");
 				}
 
-				await client.query('COMMIT')
+				await client.query("COMMIT");
 			} catch (e) {
-				await client.query("ROLLBACK")
-				throw e
+				await client.query("ROLLBACK");
+				throw e;
 			} finally {
-				client.release()
+				client.release();
 			}
-		})().catch(e => console.log(e.stack))
+		})().catch((e) => console.log(e.stack));
 	};
 
 	// sign user out
 	static signOutUser = async (req: express.Request, res: express.Response) => {
 		const { email } = req.body;
 		// find user by token and remove token
-		console.log(email);
 		pool.query(
 			"UPDATE users SET token= null WHERE email= $1",
 			[email],
@@ -142,7 +132,15 @@ export class User {
 	};
 }
 
-const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6Ik1hcmlnaTEyMUBnbWFpbC5jb20iLCJpYXQiOjE1NTUxOTA3OTh9.5tSiSK4IguXvLEVozf8_5TBnUCCGXwtfsgWSqcQI0iM"
-console.log(User.findByToken(token))
+export const authenticate = async (req: any, res: any, next: any) => {
+	const token = req.header('x-auth');
+	let user = await User.findByToken(token);
+	if (user == null) {
+		return Promise.reject();
+	}
+		req.user = user;
+		req.token = token
+		next()
+};
 
 export default User;
