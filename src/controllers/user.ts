@@ -101,16 +101,16 @@ export class User {
 					"SELECT * FROM users WHERE email= $1",
 					[email]
 				)
-				console.log(rows)
-					res.send(rows);
+				
 				const isValid = await bcrypt.compare(password, rows[0].hash)
-				if (isValid && rows[0].hash === null) {
+				if (isValid) {
+					console.log(token)
 					client.query(
-						"UPDATE users SET token= $2 WHERE email= $1",
+						"UPDATE users SET token= $1 WHERE email= $2",
 						[token, email]
-					)
-					res.status(200).header("x-auth", token).send("Success")
-				} else {
+						)
+						res.status(200).header("x-auth", token).send(rows[0])
+					} else {
 					res.status(400).send("unable to login")
 				}
 
@@ -122,33 +122,6 @@ export class User {
 				client.release()
 			}
 		})().catch(e => console.log(e.stack))
-/* 		pool.query(
-			"SELECT email, hash, token FROM users WHERE email= $1",
-			[email],
-			(error: Error, results: QueryResult) => {
-				// console.log(results.rows);
-				let row = results.rows[0];
-				const isValid = bcrypt.compare(password, row.hash);
-				if (isValid) {
-					pool.query(
-						"SELECT * FROM users WHERE email= $1 ",
-						[email],
-						(error: Error, results: QueryResult) => {
-							pool.query(
-								"UPDATE users SET token= $2 WHERE email= $1",
-								[email, token],
-								(error: Error, results: QueryResult) => {
-									res
-										.status(200)
-										.header("x-auth", token)
-										.send(results);
-								}
-							);
-						}
-					);
-				}
-			}
-		); */
 	};
 
 	// sign user out
@@ -170,6 +143,6 @@ export class User {
 }
 
 const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6Ik1hcmlnaTEyMUBnbWFpbC5jb20iLCJpYXQiOjE1NTUxOTA3OTh9.5tSiSK4IguXvLEVozf8_5TBnUCCGXwtfsgWSqcQI0iM"
-// User.findByToken(token)
+console.log(User.findByToken(token))
 
 export default User;
